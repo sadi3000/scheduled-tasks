@@ -1,38 +1,27 @@
-# To run and test the code you need to update 4 places:
-# 1. Change MY_EMAIL/MY_PASSWORD to your own details.
-# 2. Go to your email provider and make it allow less secure apps.
-# 3. Update the SMTP ADDRESS to match your email provider.
-# 4. Update birthdays.csv to contain today's month and day.
-# See the solution video in the 100 Days of Python Course for explainations.
-
-
-from datetime import datetime
-import pandas
-import random
-import smtplib
+import requests
 import os
+from twilio.rest import Client
 
-# import os and use it to get the Github repository secrets
-MY_EMAIL = os.environ.get("MY_EMAIL")
-MY_PASSWORD = os.environ.get("MY_PASSWORD")
+account_sid = "AC4ec75fb97dce6528c2ebe61363ed52f4"
+auth_token = os.environ.get("Twilio_Auth")
+parameters = {"lat": 4.771490, "lon": 7.014350, "appid": os.environ.get("OWM_Token"), "cnt":4,}
+response = requests.get(url="https://api.openweathermap.org/data/2.5/forecast", params= parameters)
+response.raise_for_status()
+weather = response.json()
+weather_codes = []
+will_rain = False
 
-today = datetime.now()
-today_tuple = (today.month, today.day)
+for item in weather["list"]:
+    new_code = item["weather"][0]["id"]
+    if int(new_code) < 700:
+        will_rain = True
 
-data = pandas.read_csv("birthdays.csv")
-birthdays_dict = {(data_row["month"], data_row["day"])                  : data_row for (index, data_row) in data.iterrows()}
-if today_tuple in birthdays_dict:
-    birthday_person = birthdays_dict[today_tuple]
-    file_path = f"letter_templates/letter_{random.randint(1, 3)}.txt"
-    with open(file_path) as letter_file:
-        contents = letter_file.read()
-        contents = contents.replace("[NAME]", birthday_person["name"])
+if will_rain:
+    client = Client(account_sid, auth_token)
+    message = client.messages .create(
+    body='It will rain today. Remember to bring an umbrella!',
+    from_='+16066490168',
+    to='+2349078168088'
+    )
 
-    with smtplib.SMTP("YOUR EMAIL PROVIDER SMTP SERVER ADDRESS") as connection:
-        connection.starttls()
-        connection.login(MY_EMAIL, MY_PASSWORD)
-        connection.sendmail(
-            from_addr=MY_EMAIL,
-            to_addrs=birthday_person["email"],
-            msg=f"Subject:Happy Birthday!\n\n{contents}"
-        )
+    print(message.status)
